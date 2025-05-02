@@ -20,6 +20,7 @@
     "@payloadcms/payload-cloud": "3.33.0",
     "@payloadcms/plugin-cloud-storage": "^3.36.1",
     "@payloadcms/richtext-lexical": "3.33.0",
+    "cloudinary": "^2.6.0",
     "cross-env": "^7.0.3",
     "graphql": "^16.8.1",
     "next": "15.3.0",
