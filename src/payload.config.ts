@@ -15,6 +15,13 @@ import { v2 as cloudinary } from 'cloudinary'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+//setting up clodinary CONFIG
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
+
 export default buildConfig({
   admin: {
     user: Users.slug,
