@@ -18,6 +18,7 @@
     "@payloadcms/db-mongodb": "3.33.0",
     "@payloadcms/next": "3.33.0",
     "@payloadcms/payload-cloud": "3.33.0",
+    "@payloadcms/plugin-cloud-storage": "^3.36.1",
     "@payloadcms/richtext-lexical": "3.33.0",
     "cross-env": "^7.0.3",
     "graphql": "^16.8.1",
