@@ -38,7 +38,24 @@ const cloudinaryAdapter = () => ({
     console.log('Data:', data)
 
     try {
-      // your upload logic here
+      // createing a function that will upload your file in cloudinary
+      // Uploading the file to Cloudinary using upload_stream.
+      // Since Cloudinary's upload_stream is callback-based, we wrap it in a Promise
+      // so we can use async/await syntax for cleaner, easier handling.
+      // It uploads the file with a specific public_id under "media/", without overwriting existing files.
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'auto', // auto-detect file type (image, video, etc.)
+            public_id: `media/${file.filename.replace(/\.[^/.]+$/, '')}`, // Set custom file name without extension
+            overwrite: false, // Do not overwrite if a file with the same name exists
+            use_filename: true, // Use original filename
+          },
+          (error, result) => (error ? reject(error) : resolve(result)), // Handle result
+        )
+        uploadStream.end(file.buffer) // this line send the file to cloudinary it means entire file is already in memory and will be send whole thing at once not in chunk
+      })
+      console.log(uploadResult)
     } catch (err) {
       console.error('Upload Error', err)
     }
