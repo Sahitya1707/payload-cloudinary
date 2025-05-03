@@ -11,7 +11,7 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { cloudStoragePlugin } from '@payloadcms/plugin-cloud-storage'
 import { v2 as cloudinary } from 'cloudinary'
-import type { HandleUpload, GenerateURL } from '@payloadcms/plugin-cloud-storage/types'
+import type { HandleUpload, HandleDelete } from '@payloadcms/plugin-cloud-storage/types'
 import type { UploadApiResponse } from 'cloudinary'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -43,7 +43,7 @@ const cloudinaryAdapter = () => ({
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             resource_type: 'auto', // auto-detect file type (image, video, etc.)
-            public_id: `media/${file.filename.replace(/\.[^/.]+$/, '')}`, // Set custom file name without extension
+            public_id: `media/${file.filename.replace(/\.[^/.]+$/, '')}`, // Set custom file name without extension, and it also previxed the cleaned filename with media/
             overwrite: false, // Do not overwrite if a file with the same name exists
             use_filename: true, // Use original filename
           },
@@ -63,7 +63,19 @@ const cloudinaryAdapter = () => ({
     }
   },
 
-  async handleDelete() {},
+  async handleDelete({ collection, doc, filename, req }: Parameters<HandleDelete>[0]) {
+    console.log('handleDelete has been called')
+
+    // if filename is present then we will look for that file
+    try {
+      // We remove the file extension from the filename and then target the file
+      // inside the "media/" folder on Cloudinary (which we used as the upload path)
+      await cloudinary.uploader.destroy(`media/${filename.replace(/\.[^/.]+$/, '')}`)
+    } catch (error) {
+      // if something error occured we will catch the error and respond the error in console
+      console.error('Cloudinary Delete Error:', error)
+    }
+  },
   staticHandler() {
     return new Response('Not implemented', { status: 501 })
   },
@@ -94,8 +106,8 @@ export default buildConfig({
           adapter: cloudinaryAdapter,
           disableLocalStorage: true,
           generateFileURL: ({ filename }) => {
-            // since we uploaded file to the media folder we will use media in our url to get the correct url from cloduinary
-
+            // Since we uploaded the file with a "media/" prefix in its public_id,
+            // we include "media/" here to correctly generate the Cloudinary URL for the file.
             return cloudinary.url(`media/${filename}`, { secure: true })
           },
         },
