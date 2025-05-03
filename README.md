@@ -1,67 +1,122 @@
-# Payload Blank Template
+# ☁️ Payload CMS + Cloudinary Integration
 
-This template comes configured with the bare minimum to get started on anything you need.
+This repo demonstrates how to upload media from [Payload CMS](https://payloadcms.com/) directly to [Cloudinary](https://cloudinary.com/) using the new `@payloadcms/plugin-cloud-storage`.
 
-## Quick start
+✅ No local file storage  
+✅ Cloudinary-hosted URLs  
+✅ Full working example
 
-This template can be deployed directly from our Cloud hosting and it will setup MongoDB and cloud S3 object storage for media.
+---
 
-## Quick Start - local setup
+## 🔗 Blog Guide
 
-To spin up this template locally, follow these steps:
+I wrote a full blog explaining this step-by-step with code and reasoning:  
+📖 [Read it on Medium](https://medium.com/@neupanesahitya1/how-i-integrated-cloudinary-with-payload-cms-so-you-dont-have-to-struggle-like-i-did-58ace37dd531)
 
-### Clone
+---
 
-After you click the `Deploy` button above, you'll want to have standalone copy of this repo on your machine. If you've already cloned this repo, skip to [Development](#development).
+## 🛠️ Setup
 
-### Development
+### 1. Create a Payload Project
 
-1. First [clone the repo](#clone) if you have not done so already
-2. `cd my-project && cp .env.example .env` to copy the example environment variables. You'll need to add the `MONGODB_URI` from your Cloud project to your `.env` if you want to use S3 storage and the MongoDB database that was created for you.
+```bash
+npx create-payload-app@latest -t blank
+2. Install Dependencies
+bash
+Copy
+Edit
+npm install cloudinary @payloadcms/plugin-cloud-storage
+⚙️ Configure Environment
+Create a .env file with the following values (or use .env.example from this repo):
 
-3. `pnpm install && pnpm dev` to install dependencies and start the dev server
-4. open `http://localhost:3000` to open the app in your browser
+env
+Copy
+Edit
+CLOUDINARY_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+🧩 Cloudinary Adapter (Inline in Config)
+The adapter handles file upload, delete, and URL generation using Cloudinary's API.
 
-That's it! Changes made in `./src` will be reflected in your app. Follow the on-screen instructions to login and create your first admin user. Then check out [Production](#production) once you're ready to build and serve your app, and [Deployment](#deployment) when you're ready to go live.
+ts
+Copy
+Edit
+import type { HandleUpload, HandleDelete } from '@payloadcms/plugin-cloud-storage/types'
+import type { UploadApiResponse } from 'cloudinary'
 
-#### Docker (Optional)
+const cloudinaryAdapter = () => ({
+  name: 'cloudinary-adapter',
+  async handleUpload({ file }: Parameters<HandleUpload>[0]) {
+    try {
+      const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'auto',
+            public_id: `media/${file.filename.replace(/\.[^/.]+$/, '')}`,
+            overwrite: false,
+            use_filename: true,
+          },
+          (error, result) => {
+            if (error) return reject(error)
+            if (!result) return reject(new Error('No result returned from Cloudinary'))
+            resolve(result)
+          },
+        )
+        uploadStream.end(file.buffer)
+      })
 
-If you prefer to use Docker for local development instead of a local MongoDB instance, the provided docker-compose.yml file can be used.
+      file.filename = uploadResult.public_id
+      file.mimeType = `${uploadResult.format}`
+      file.filesize = uploadResult.bytes
+    } catch (err) {
+      console.error('Upload Error', err)
+    }
+  },
 
-To do so, follow these steps:
+  async handleDelete({ filename }: Parameters<HandleDelete>[0]) {
+    try {
+      await cloudinary.uploader.destroy(`media/${filename.replace(/\.[^/.]+$/, '')}`)
+    } catch (error) {
+      console.error('Cloudinary Delete Error:', error)
+    }
+  },
 
-- Modify the `MONGODB_URI` in your `.env` file to `mongodb://127.0.0.1/<dbname>`
-- Modify the `docker-compose.yml` file's `MONGODB_URI` to match the above `<dbname>`
-- Run `docker-compose up` to start the database, optionally pass `-d` to run in the background.
+  staticHandler() {
+    return new Response('Not implemented', { status: 501 })
+  },
+})
+🔌 Register the Plugin
+In your payload.config.ts:
 
-## How it works
+ts
+Copy
+Edit
+import { cloudStoragePlugin } from '@payloadcms/plugin-cloud-storage'
 
-The Payload config is tailored specifically to the needs of most websites. It is pre-configured in the following ways:
+plugins: [
+  cloudStoragePlugin({
+    collections: {
+      media: {
+        adapter: cloudinaryAdapter,
 
-### Collections
+        disableLocalStorage: true, // Store files only in Cloudinary
 
-See the [Collections](https://payloadcms.com/docs/configuration/collections) docs for details on how to extend this functionality.
+        generateFileURL: ({ filename }) => {
+          return cloudinary.url(`media/${filename}`, { secure: true })
+        },
+      },
+    },
+  }),
+]
+📸 What You Get
+✅ File uploads go directly to Cloudinary
 
-- #### Users (Authentication)
+🌐 Public URLs are shown inside the Payload admin panel
 
-  Users are auth-enabled collections that have access to the admin panel.
+🗑️ Deleted media gets removed from Cloudinary too
 
-  For additional help, see the official [Auth Example](https://github.com/payloadcms/payload/tree/main/examples/auth) or the [Authentication](https://payloadcms.com/docs/authentication/overview#authentication-overview) docs.
-
-- #### Media
-
-  This is the uploads enabled collection. It features pre-configured sizes, focal point and manual resizing to help you manage your pictures.
-
-### Docker
-
-Alternatively, you can use [Docker](https://www.docker.com) to spin up this template locally. To do so, follow these steps:
-
-1. Follow [steps 1 and 2 from above](#development), the docker-compose file will automatically use the `.env` file in your project root
-1. Next run `docker-compose up`
-1. Follow [steps 4 and 5 from above](#development) to login and create your first admin user
-
-That's it! The Docker instance will help you get up and running quickly while also standardizing the development environment across your teams.
-
-## Questions
-
-If you have any issues or questions, reach out to us on [Discord](https://discord.com/invite/payload) or start a [GitHub discussion](https://github.com/payloadcms/payload/discussions).
+⭐ Contribute
+If this helped you, consider starring the repo and sharing the blog:
+📌 GitHub Repo
+📖 Blog Post
+```
