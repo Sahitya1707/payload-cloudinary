@@ -11,8 +11,8 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { cloudStoragePlugin } from '@payloadcms/plugin-cloud-storage'
 import { v2 as cloudinary } from 'cloudinary'
-import type { HandleUpload } from '@payloadcms/plugin-cloud-storage/types'
-
+import type { HandleUpload, GenerateURL } from '@payloadcms/plugin-cloud-storage/types'
+import type { UploadApiResponse } from 'cloudinary'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
@@ -33,17 +33,13 @@ const cloudinaryAdapter = () => ({
     req,
     clientUploadContext,
   }: Parameters<HandleUpload>[0]) {
-    console.log('File:', file)
-    console.log('Collection:', collection)
-    console.log('Data:', data)
-
     try {
       // createing a function that will upload your file in cloudinary
       // Uploading the file to Cloudinary using upload_stream.
       // Since Cloudinary's upload_stream is callback-based, we wrap it in a Promise
       // so we can use async/await syntax for cleaner, easier handling.
       // It uploads the file with a specific public_id under "media/", without overwriting existing files.
-      const uploadResult = await new Promise((resolve, reject) => {
+      const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             resource_type: 'auto', // auto-detect file type (image, video, etc.)
@@ -51,15 +47,22 @@ const cloudinaryAdapter = () => ({
             overwrite: false, // Do not overwrite if a file with the same name exists
             use_filename: true, // Use original filename
           },
-          (error, result) => (error ? reject(error) : resolve(result)), // Handle result
+          (error, result) => {
+            if (error) return reject(error)
+            if (!result) return reject(new Error('No result returned from Cloudinary'))
+            resolve(result) // hanlde result
+          },
         )
         uploadStream.end(file.buffer) // this line send the file to cloudinary it means entire file is already in memory and will be send whole thing at once not in chunk
       })
-      console.log(uploadResult)
+      file.filename = uploadResult.public_id // Use Cloudinary's public_id as the file's unique name
+      file.mimeType = `${uploadResult.format}` // Set MIME type based on Cloudinary's format (e.g., image/png)
+      file.filesize = uploadResult.bytes // Set the actual file size in bytes, for admin display and validations
     } catch (err) {
       console.error('Upload Error', err)
     }
   },
+
   async handleDelete() {},
   staticHandler() {
     return new Response('Not implemented', { status: 501 })
@@ -90,6 +93,11 @@ export default buildConfig({
         media: {
           adapter: cloudinaryAdapter,
           disableLocalStorage: true,
+          generateFileURL: ({ filename }) => {
+            // since we uploaded file to the media folder we will use media in our url to get the correct url from cloduinary
+
+            return cloudinary.url(`media/${filename}`, { secure: true })
+          },
         },
       },
     }),
